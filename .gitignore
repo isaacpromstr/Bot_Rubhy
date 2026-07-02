@@ -1,0 +1,12 @@
+# Carpetas de compilación y salida de .NET
+[Bb]in/
+[Oo]bj/
+
+# Configuraciones del IDE
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Archivos de configuración locales que contienen secretos/tokens
+config.json
