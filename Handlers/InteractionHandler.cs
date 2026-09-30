@@ -69,26 +69,37 @@ namespace Plantillabot.Handlers
         /// </summary>
         private async Task HandleSlashCommandAsync(SocketSlashCommand command)
         {
-            if (command.CommandName == "configurar-panel")
+            try
             {
-                // Verificar que el usuario tenga permisos de Administrador para configurar el panel.
-                var guildUser = command.User as SocketGuildUser;
-                if (guildUser == null || !guildUser.GuildPermissions.Administrator)
+                if (command.CommandName == "configurar-panel")
                 {
-                    await command.RespondAsync("❌ Solo los administradores del servidor pueden configurar el panel de soporte.", ephemeral: true);
-                    return;
+                    // Verificar que el usuario tenga permisos de Administrador para configurar el panel.
+                    var guildUser = command.User as SocketGuildUser;
+                    if (guildUser == null || !guildUser.GuildPermissions.Administrator)
+                    {
+                        await command.RespondAsync("❌ Solo los administradores del servidor pueden configurar el panel de soporte.", ephemeral: true);
+                        return;
+                    }
+
+                    // Construir el formulario interactivo (Modal) de 3 apartados: Título, Descripción y URL de la imagen.
+                    var modalBuilder = new ModalBuilder()
+                        .WithTitle("Configurar Panel de Citas")
+                        .WithCustomId("config_panel_modal")
+                        .AddTextInput("Título del Panel", "modal_titulo", placeholder: "Ej. Consultorio NiftyOk", required: true, value: _config.PanelTitle)
+                        .AddTextInput("Descripción del Panel", "modal_descripcion", TextInputStyle.Paragraph, placeholder: "Instrucciones de la cita...", required: true, value: _config.PanelDescription)
+                        .AddTextInput("URL de la Imagen", "modal_imagen", placeholder: "Ej. https://i.imgur.com/K3Z1mP6.png", required: false, value: _config.PanelImageUrl);
+
+                    // Mostrar el modal al administrador de Discord.
+                    await command.RespondWithModalAsync(modalBuilder.Build());
                 }
-
-                // Construir el formulario interactivo (Modal) de 3 apartados: Título, Descripción y URL de la imagen.
-                var modalBuilder = new ModalBuilder()
-                    .WithTitle("Configurar Panel de Citas")
-                    .WithCustomId("config_panel_modal")
-                    .AddTextInput("Título del Panel", "modal_titulo", placeholder: "Ej. Consultorio NiftyOk", required: true, value: _config.PanelTitle)
-                    .AddTextInput("Descripción del Panel", "modal_descripcion", TextInputStyle.Paragraph, placeholder: "Instrucciones de la cita...", required: true, value: _config.PanelDescription)
-                    .AddTextInput("URL de la Imagen", "modal_imagen", placeholder: "Ej. https://i.imgur.com/K3Z1mP6.png", required: false, value: _config.PanelImageUrl);
-
-                // Mostrar el modal al administrador de Discord.
-                await command.RespondWithModalAsync(modalBuilder.Build());
+            }
+            catch (Discord.Net.HttpException ex) when ((int?)ex.DiscordCode == 40060)
+            {
+                Console.WriteLine($"[Aviso] La interacción del comando /{command.CommandName} ya fue respondida.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al procesar el comando slash /{command.CommandName}: {ex.Message}");
             }
         }
 
