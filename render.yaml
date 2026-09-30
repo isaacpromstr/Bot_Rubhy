@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: bot-de-rubhy
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: PORT
+        value: 10000

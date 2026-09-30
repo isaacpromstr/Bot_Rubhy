@@ -25,6 +25,9 @@ namespace Plantillabot
 
         public async Task RunAsync()
         {
+            // 0. Iniciar servidor de Health Check HTTP para Render (Web Service o Background).
+            StartHealthCheckServer();
+
             // 1. Configurar e instanciar los servicios requeridos de forma modular en el Heap.
             var services = ConfigureServices();
 
@@ -48,6 +51,70 @@ namespace Plantillabot
 
             // Mantener la aplicación en ejecución indefinidamente en un bucle asíncrono.
             await Task.Delay(Timeout.Infinite);
+        }
+
+        /// <summary>
+        /// Inicia un servidor HTTP ligero para responder al health-check de Render (puerto $PORT)
+        /// y mantener el bot activo 24/7 sin cerrarse.
+        /// </summary>
+        private static void StartHealthCheckServer()
+        {
+            string? portStr = Environment.GetEnvironmentVariable("PORT");
+            int port = 8080;
+            if (!string.IsNullOrEmpty(portStr) && int.TryParse(portStr, out int parsedPort))
+            {
+                port = parsedPort;
+            }
+
+            Task.Run(async () =>
+            {
+                try
+                {
+                    var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Any, port);
+                    listener.Start();
+                    Console.WriteLine($"[Render HealthCheck] Servidor HTTP activo en el puerto {port}.");
+
+                    while (true)
+                    {
+                        var client = await listener.AcceptTcpClientAsync();
+                        _ = HandleHttpClientAsync(client);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Render HealthCheck] Advertencia: {ex.Message}");
+                }
+            });
+        }
+
+        private static async Task HandleHttpClientAsync(System.Net.Sockets.TcpClient client)
+        {
+            using (client)
+            using (var stream = client.GetStream())
+            using (var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8))
+            using (var writer = new System.IO.StreamWriter(stream, new System.Text.UTF8Encoding(false)) { AutoFlush = true })
+            {
+                try
+                {
+                    string? line;
+                    while (!string.IsNullOrEmpty(line = await reader.ReadLineAsync())) { }
+
+                    string jsonResponse = "{\"status\":\"ok\",\"bot\":\"Bot de Rubhy en linea 24/7\"}";
+                    byte[] responseBytes = System.Text.Encoding.UTF8.GetBytes(jsonResponse);
+
+                    await writer.WriteAsync(
+                        "HTTP/1.1 200 OK\r\n" +
+                        "Content-Type: application/json; charset=utf-8\r\n" +
+                        $"Content-Length: {responseBytes.Length}\r\n" +
+                        "Connection: close\r\n\r\n" +
+                        jsonResponse
+                    );
+                }
+                catch
+                {
+                    // Errores menores de desconexión de sockets
+                }
+            }
         }
 
         /// <summary>
