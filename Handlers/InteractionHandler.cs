@@ -35,11 +35,32 @@ namespace Plantillabot.Handlers
 
         public Task InitializeAsync()
         {
-            // Suscribir los eventos del cliente para el procesamiento asíncrono en el Heap ("memoria dinámica").
-            _client.Ready += RegisterCommandsAsync;
-            _client.SlashCommandExecuted += HandleSlashCommandAsync;
-            _client.ButtonExecuted += HandleButtonExecutedAsync;
-            _client.ModalSubmitted += HandleModalSubmittedAsync;
+            // Suscribir los eventos del cliente desacoplados en tareas secundarias (Task.Run)
+            // para NUNCA bloquear el Gateway de Discord.Net ni causar timeouts.
+            _client.Ready += () =>
+            {
+                _ = Task.Run(RegisterCommandsAsync);
+                return Task.CompletedTask;
+            };
+
+            _client.SlashCommandExecuted += command =>
+            {
+                _ = Task.Run(() => HandleSlashCommandAsync(command));
+                return Task.CompletedTask;
+            };
+
+            _client.ButtonExecuted += component =>
+            {
+                _ = Task.Run(() => HandleButtonExecutedAsync(component));
+                return Task.CompletedTask;
+            };
+
+            _client.ModalSubmitted += modal =>
+            {
+                _ = Task.Run(() => HandleModalSubmittedAsync(modal));
+                return Task.CompletedTask;
+            };
+
             return Task.CompletedTask;
         }
 
@@ -143,10 +164,18 @@ namespace Plantillabot.Handlers
                     }
                 }
             }
+            catch (Discord.Net.HttpException ex) when ((int?)ex.DiscordCode == 10062)
+            {
+                Console.WriteLine("[Aviso] La interacción del botón expiró o ya fue atendida por otra instancia (10062: Unknown interaction).");
+            }
+            catch (Discord.Net.HttpException ex) when ((int?)ex.DiscordCode == 40060)
+            {
+                Console.WriteLine("[Aviso] La interacción del botón ya fue respondida previamente (40060).");
+            }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error al manejar el botón: {ex.Message}");
-                // Si la interacción ya fue respondida, enviar un mensaje de error por separado.
+                // Si la interacción ya fue respondida, intentar enviar un mensaje de error por separado.
                 try
                 {
                     await interaction.FollowupAsync("❌ Ocurrió un error al procesar tu solicitud.", ephemeral: true);
@@ -167,7 +196,7 @@ namespace Plantillabot.Handlers
             {
                 try
                 {
-                    // Responder diferido de forma efímera.
+                    // Responder diferido de forma efímera inmediatamente para evitar timeout.
                     await modal.DeferAsync(ephemeral: true);
 
                     // Extraer los valores ingresados por el usuario administrador en el formulario.
@@ -200,6 +229,14 @@ namespace Plantillabot.Handlers
                     {
                         await modal.FollowupAsync("❌ No se pudo determinar el canal para enviar el panel.", ephemeral: true);
                     }
+                }
+                catch (Discord.Net.HttpException ex) when ((int?)ex.DiscordCode == 10062)
+                {
+                    Console.WriteLine("[Aviso] La interacción del formulario modal expiró o ya fue atendida por otra instancia (10062: Unknown interaction).");
+                }
+                catch (Discord.Net.HttpException ex) when ((int?)ex.DiscordCode == 40060)
+                {
+                    Console.WriteLine("[Aviso] La interacción del formulario modal ya fue respondida previamente (40060).");
                 }
                 catch (Exception ex)
                 {

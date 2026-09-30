@@ -130,7 +130,8 @@ namespace Plantillabot
                                  GatewayIntents.GuildMessages | 
                                  GatewayIntents.GuildMembers | 
                                  GatewayIntents.MessageContent,
-                AlwaysDownloadUsers = true
+                AlwaysDownloadUsers = true,
+                HandlerTimeout = null // Desactiva advertencias de TimeoutWrap y permite que las tareas desacopladas se ejecuten libremente
             };
 
             return new ServiceCollection()
